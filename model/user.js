@@ -4,7 +4,7 @@ const exerciseSchema = new Schema(
   {
     description: String,
     duration: Number,
-    date: Date,
+    date: { type: Date, get: (v) => v.toDateString() },
   },
   { _id: false }
 );

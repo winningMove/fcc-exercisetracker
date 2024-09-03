@@ -5,7 +5,6 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const User = require("./model/user.js");
-const Exercise = require("./model/exercise.js");
 
 const testDb = [];
 let testUserId = 1;
@@ -30,7 +29,7 @@ app
       id = testDb.find((o) => o.username === name)._id;
     } else {
       id = "" + testUserId++;
-      testDb.push({ username: name, _id: id });
+      testDb.push({ username: name, _id: id, log: [] });
     }
     res.json({
       username: name,
@@ -38,12 +37,59 @@ app
     });
   })
   .get(function (req, res) {
-    res.json(testDb);
+    res.json(
+      testDb.map((o) => {
+        const { log, ...logless } = o;
+        return logless;
+      })
+    );
   });
 
 app.route("/api/users/:_id/exercises").post(function (req, res) {
   console.log(req.body);
-  res.json({ placeholder: true });
+  const description = req.body.description;
+  const duration = req.body.duration;
+  const date = req.body.date ? new Date(req.body.date) : new Date();
+
+  const user = testDb.find((o) => o._id === req.body._id);
+  if (!user) {
+    return res.json({ error: "no user exists with that id" });
+  }
+
+  user.log.push({
+    description: description,
+    duration: duration,
+    date: date,
+  });
+
+  res.json({
+    username: user.username,
+    _id: user._id,
+    description: description,
+    duration: parseInt(duration),
+    date: date.toDateString(),
+  });
+});
+
+app.get("/api/users/:_id/logs", function (req, res) {
+  const id = req.params._id;
+  const user = testDb.find((o) => o._id === id);
+
+  if (!user) {
+    return res.json({ error: "no user exists with that id" });
+  }
+
+  res.json({
+    ...user,
+    log: user.log.map((o) => {
+      return {
+        ...o,
+        date: o.date.toDateString(),
+        duration: parseInt(o.duration),
+      };
+    }),
+    count: user.log.length,
+  });
 });
 
 const listener = app.listen(process.env.PORT || 3000, () => {
