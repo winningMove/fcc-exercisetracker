@@ -15,7 +15,7 @@ app.use(
   bodyParser.json(),
   cors({ optionsSuccessStatus: 200 })
 );
-app.use(express.static("public"));
+app.use("/public", express.static(`${__dirname}/public`));
 app.get("/", (req, res) => {
   res.sendFile(__dirname + "/views/index.html");
 });
@@ -40,6 +40,11 @@ app
   .get(function (req, res) {
     res.json(testDb);
   });
+
+app.route("/api/users/:_id/exercises").post(function (req, res) {
+  console.log(req.body);
+  res.json({ placeholder: true });
+});
 
 const listener = app.listen(process.env.PORT || 3000, () => {
   console.log("Your app is listening on port " + listener.address().port);
