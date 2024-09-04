@@ -10,6 +10,10 @@ const testDb = [];
 let testUserId = 1;
 
 app.use(
+  (req, res, next) => {
+    res.setHeader("Access-Control-Allow-Private-Network", true);
+    next();
+  },
   bodyParser.urlencoded({ extended: false }),
   bodyParser.json(),
   cors({ optionsSuccessStatus: 200 })
@@ -22,7 +26,6 @@ app.get("/", (req, res) => {
 app
   .route("/api/users")
   .post(function (req, res) {
-    console.log(req.body);
     let name = req.body?.username;
     let id;
     if (testDb.find((o) => o.username === name)) {
@@ -46,12 +49,12 @@ app
   });
 
 app.post("/api/users/:_id/exercises", function (req, res) {
-  console.log(req.body);
   const description = req.body.description;
   const duration = req.body.duration;
   const date = req.body.date ? new Date(req.body.date) : new Date();
+  const idParam = req.params._id;
 
-  const user = testDb.find((o) => o._id === req.body._id);
+  const user = testDb.find((o) => o._id === idParam);
   if (!user) {
     return res.json({ error: "no user exists with that id" });
   }
@@ -79,7 +82,14 @@ app.get("/api/users/:_id/logs", function (req, res) {
     return res.json({ error: "no user exists with that id" });
   }
 
-  let logToReturn = user.log;
+  if (user.log.length === 0) {
+    return res.json({
+      ...user,
+      count: 0,
+    });
+  }
+
+  let logToReturn = [...user.log];
 
   if (req.query) {
     if (req.query.from && req.query.to) {
@@ -91,7 +101,7 @@ app.get("/api/users/:_id/logs", function (req, res) {
     }
     if (req.query.limit) {
       logToReturn = logToReturn.slice(
-        logtoReturn.length - parseInt(req.query.limit)
+        logToReturn.length - parseInt(req.query.limit)
       );
     }
   }

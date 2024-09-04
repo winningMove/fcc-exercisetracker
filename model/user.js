@@ -1,4 +1,4 @@
-const { default: mongoose, Schema, SchemaTypes } = require("mongoose");
+const { default: mongoose, Schema } = require("mongoose");
 
 const exerciseSchema = new Schema(
   {
@@ -10,7 +10,7 @@ const exerciseSchema = new Schema(
 );
 
 const userSchema = new Schema({
-  username: String,
+  username: { type: String, required: true, unique: true },
   exerciseLog: [exerciseSchema],
 });
 
