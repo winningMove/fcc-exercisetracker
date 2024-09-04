@@ -45,7 +45,7 @@ app
     );
   });
 
-app.route("/api/users/:_id/exercises").post(function (req, res) {
+app.post("/api/users/:_id/exercises", function (req, res) {
   console.log(req.body);
   const description = req.body.description;
   const duration = req.body.duration;
@@ -79,16 +79,33 @@ app.get("/api/users/:_id/logs", function (req, res) {
     return res.json({ error: "no user exists with that id" });
   }
 
+  let logToReturn = user.log;
+
+  if (req.query) {
+    if (req.query.from && req.query.to) {
+      const fromDate = new Date(req.query.from);
+      const toDate = new Date(req.query.to);
+      logToReturn = logToReturn.filter(
+        (e) => e.date >= fromDate && e.date <= toDate
+      );
+    }
+    if (req.query.limit) {
+      logToReturn = logToReturn.slice(
+        logtoReturn.length - parseInt(req.query.limit)
+      );
+    }
+  }
+
   res.json({
     ...user,
-    log: user.log.map((o) => {
+    log: logToReturn.map((o) => {
       return {
         ...o,
         date: o.date.toDateString(),
         duration: parseInt(o.duration),
       };
     }),
-    count: user.log.length,
+    count: logToReturn.length,
   });
 });
 
