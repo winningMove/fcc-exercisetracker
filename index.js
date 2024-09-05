@@ -6,9 +6,6 @@ const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const User = require("./model/user.js");
 
-const testDb = [];
-let testUserId = 1;
-
 app.use(
   (req, res, next) => {
     res.setHeader("Access-Control-Allow-Private-Network", true);
@@ -23,98 +20,103 @@ app.get("/", (req, res) => {
   res.sendFile(__dirname + "/views/index.html");
 });
 
+try {
+  await mongoose.connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useCreateIndex: true,
+  });
+  console.log("Successfully connected to database.");
+} catch (error) {
+  console.log("Failed to connect to database due to error:" + error);
+}
+mongoose.connection.on("error", (e) => {
+  console.log("Error: " + e);
+});
+
 app
   .route("/api/users")
-  .post(function (req, res) {
-    let name = req.body?.username;
-    let id;
-    if (testDb.find((o) => o.username === name)) {
-      id = testDb.find((o) => o.username === name)._id;
-    } else {
-      id = "" + testUserId++;
-      testDb.push({ username: name, _id: id, log: [] });
-    }
+  .post(async (req, res) => {
+    //async might not work in Express 4, if errors occur try without
+    const name = req.body?.username;
+
+    let user = await User.findOne({ username: name }, "-exerciseLog").exec();
+    if (user) return res.json({ error: "User with that name already exists." });
+
+    const { username, id } = await new User({ username: name }).save();
+
     res.json({
-      username: name,
+      username,
       _id: id,
     });
   })
-  .get(function (req, res) {
-    res.json(
-      testDb.map((o) => {
-        const { log, ...logless } = o;
-        return logless;
-      })
-    );
+  .get(async (_, res) => {
+    const users = await User.find({}, "-exerciseLog").exec();
+    res.json(users.map(({ username, id }) => ({ username, _id: id })));
   });
 
-app.post("/api/users/:_id/exercises", function (req, res) {
-  const description = req.body.description;
-  const duration = req.body.duration;
-  const date = req.body.date ? new Date(req.body.date) : new Date();
+app.post("/api/users/:_id/exercises", async (req, res) => {
   const idParam = req.params._id;
 
-  const user = testDb.find((o) => o._id === idParam);
+  let user = await User.findById(idParam).exec();
   if (!user) {
-    return res.json({ error: "no user exists with that id" });
+    return res.json({ error: "No user exists with that id." });
   }
 
-  user.log.push({
-    description: description,
-    duration: duration,
-    date: date,
-  });
+  let { description, duration, date: tempDate } = req.body;
+  duration = parseInt(duration);
+  const date = tempDate ? new Date(tempDate) : new Date();
+
+  user.exerciseLog.push({ description, duration, date });
+  user = await user.save();
 
   res.json({
     username: user.username,
-    _id: user._id,
-    description: description,
-    duration: parseInt(duration),
+    _id: user.id,
+    description,
+    duration,
     date: date.toDateString(),
   });
 });
 
-app.get("/api/users/:_id/logs", function (req, res) {
-  const id = req.params._id;
-  const user = testDb.find((o) => o._id === id);
-
+app.get("/api/users/:_id/logs", async (req, res) => {
+  const idParam = req.params._id;
+  let user = await User.findById(idParam).exec();
   if (!user) {
-    return res.json({ error: "no user exists with that id" });
+    return res.json({ error: "No user exists with that id." });
   }
+  const { username, id } = user;
 
-  if (user.log.length === 0) {
+  if (user.exerciseLog.length === 0) {
     return res.json({
-      ...user,
+      username,
+      _id: id,
+      log: [],
       count: 0,
     });
   }
 
-  let logToReturn = [...user.log];
+  let logToReturn = [...user.exerciseLog];
+  const { from, to, limit } = req.query;
 
-  if (req.query) {
-    if (req.query.from && req.query.to) {
-      const fromDate = new Date(req.query.from);
-      const toDate = new Date(req.query.to);
-      logToReturn = logToReturn.filter(
-        (e) => e.date >= fromDate && e.date <= toDate
-      );
-    }
-    if (req.query.limit) {
-      logToReturn = logToReturn.slice(
-        logToReturn.length - parseInt(req.query.limit)
-      );
-    }
+  if (from && to) {
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    logToReturn = logToReturn.filter(
+      (e) => e.date >= fromDate && e.date <= toDate
+    );
+  }
+  if (limit) {
+    logToReturn = logToReturn.slice(-parseInt(limit));
   }
 
   res.json({
-    ...user,
-    log: logToReturn.map((o) => {
-      return {
-        ...o,
-        date: o.date.toDateString(),
-        duration: parseInt(o.duration),
-      };
-    }),
+    username,
+    _id: id,
+    log: logToReturn.map(({ description, duration, date }) => ({
+      description,
+      duration,
+      date: date.toDateString(),
+    })),
     count: logToReturn.length,
   });
 });
