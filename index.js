@@ -4,7 +4,7 @@ const cors = require("cors");
 require("dotenv").config();
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
-const User = require("./model/user.js");
+const User = require("./model/user");
 
 app.use(
   (req, res, next) => {
@@ -20,15 +20,14 @@ app.get("/", (req, res) => {
   res.sendFile(__dirname + "/views/index.html");
 });
 
-try {
-  await mongoose.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useCreateIndex: true,
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => {
+    console.log("Successfully connected to database.");
+  })
+  .catch((e) => {
+    console.log("Failed to connect to database due to error: " + e);
   });
-  console.log("Successfully connected to database.");
-} catch (error) {
-  console.log("Failed to connect to database due to error:" + error);
-}
 mongoose.connection.on("error", (e) => {
   console.log("Error: " + e);
 });
@@ -36,7 +35,6 @@ mongoose.connection.on("error", (e) => {
 app
   .route("/api/users")
   .post(async (req, res) => {
-    //async might not work in Express 4, if errors occur try without
     const name = req.body?.username;
 
     let user = await User.findOne({ username: name }, "-exerciseLog").exec();
